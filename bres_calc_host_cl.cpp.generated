@@ -1,0 +1,172 @@
+
+extern float alpha;
+extern float cfl;
+extern float eps;
+extern float gam;
+extern float gm1;
+extern float mach;
+extern float qinf[4UL];
+int threadsPerBlockSize_bres_calc = 256;
+int setPartitionSize_bres_calc = 256;
+
+long max(long a, long b) {
+  if (a >= b) {
+    return a;
+  } 
+  return b;
+}
+void bres_calc_host(const char *userSubroutine,op_set set,op_arg opDat1,op_arg opDat2,op_arg opDat3,op_arg opDat4,op_arg opDat5,op_arg opDat6)
+{
+//  printf("bres_calc_set %d\n", set);
+  cl_mem qinf_d = op_allocate_constant(&qinf, 4*sizeof(float));
+  cl_mem gm1_d = op_allocate_constant(&gm1, sizeof(float));
+  cl_mem eps_d = op_allocate_constant(&eps, sizeof(float));
+  size_t blocksPerGrid;
+  size_t threadsPerBlock;
+  size_t totalThreadNumber;
+  size_t dynamicSharedMemorySize;
+  cl_int errorCode;
+  cl_event event;
+  cl_kernel kernelPointer;
+  int i3;
+  op_arg opDatArray[6];
+  int indirectionDescriptorArray[6];
+  op_plan *planRet;
+  int blockOffset;
+  opDatArray[0] = opDat1;
+  opDatArray[1] = opDat2;
+  opDatArray[2] = opDat3;
+  opDatArray[3] = opDat4;
+  opDatArray[4] = opDat5;
+  opDatArray[5] = opDat6;
+  indirectionDescriptorArray[0] = 0;
+  indirectionDescriptorArray[1] = 0;
+  indirectionDescriptorArray[2] = 1;
+  indirectionDescriptorArray[3] = 2;
+  indirectionDescriptorArray[4] = 3;
+  indirectionDescriptorArray[5] = -1;
+  for(int m = 0; m < 6; ++m) {
+    //printf("arg[%d].argtype: %d\n", m, opDatArray[m].argtype);
+    printf("arg[%d].dim: %d\n", m, opDatArray[m].dim);
+    printf("arg[%d].idx: %d\n", m, opDatArray[m].idx);
+    printf("arg[%d].size: %d\n", m, opDatArray[m].size);
+  }
+  //printf("BRES_CALC name: %s\n", userSubroutine);
+  //printf("BRES_CALC set: %s\n", set->name);
+  //printf("BRES_CALC setPartitionSize_bres_calc: %d\n", setPartitionSize_bres_calc);
+  //for(int m = 0; m < 1; ++m) {
+    //printf("ARG[%d] size = %d\n", m, opDatArray[m].size);
+  //}
+  //for(int m = 0; m < 6; ++m) {
+    //printf("indirDescriptor[%d] = %d\n", m, indirectionDescriptorArray[m]);
+  //}
+  /*for(int m = 5; m < 6; ++m) {
+    op_fetch_data(opDatArray[m].dat);
+    float * array = (float *) opDatArray[m].dat->data;
+    for(int n = 0; n < opDatArray[m].dat->set->size*opDatArray[m].dat->dim; ++n) {
+      printf("%f\n", array[n]);
+    }
+  }*/
+
+  //mappings for opDatArray1 &2 & ...all are the same
+  /*for(int m = 5; m < 6; ++m) {
+    int * mapping = opDatArray[m].map->map;
+    //long size = max(opDatArray[m].map->to->size, opDatArray[m].map->from->size);
+    for(int n = 0; n < opDatArray[m].map->from->size * opDatArray[m].map->dim; ++n) {
+    //for(int n = 0; n < opDatArray[m].map->from->size; ++n) {
+      printf("%d\n", mapping[n]);
+    }
+  }*/
+  planRet = op_plan_get(userSubroutine,set,setPartitionSize_bres_calc,6,opDatArray,4,indirectionDescriptorArray);
+
+/*    for(int m = 0; m < 1; ++m) {
+      for(int n = 0; n < planRet->nindirect[m]; ++n) {
+        printf("%d\n", planRet->ind_maps[m][n]);
+      }
+    }*/
+    //exit ( 0 );
+  //checking the retrieved plan
+  /*  int match = 0;
+  if(strcmp ( userSubroutine, planRet->name) == 0
+      && (set == planRet->set)
+      && (setPartitionSize_bres_calc == planRet->part_size) 
+      && (6 == planRet->nargs)
+      && (4 == planRet->ninds)) {
+    match = 1;
+  }
+  
+  if(match) {  
+    for(int m = 0; m < 6; ++m) {
+      match = match && (opDatArray[m].dat == planRet->dats[m])
+        && (opDatArray[m].map == planRet->maps[m])
+        && (opDatArray[m].idx == planRet->idxs[m])
+        && (opDatArray[m].acc == planRet->accs[m]);
+    }
+  */
+/*    for(int m = 0; m < 6; ++m) {
+      printf("dat[%d].idx = %d\n", m, opDatArray[m].idx);
+      printf("dat[%d].acc = %d\n", m, opDatArray[m].acc);
+      printf("plan->nindirect[%d] = %d\n", m, planRet->nindirect[m]);
+    } 
+    //printf("MATCH: %d\n", match);
+    */
+    //   printf("SIZE OF INT: %d\n", sizeof(int));
+    // } else {
+    // printf("User set parameters of the plan function are different from those returned in the plan.\n");
+    // }
+
+  //printf("BRES_CALC_plan_retrieved\n");
+  blockOffset = 0;
+  for (i3 = 0; i3 < planRet -> ncolors; ++i3) {
+    blocksPerGrid = planRet -> ncolblk[i3];
+    dynamicSharedMemorySize = planRet -> nshared;
+    threadsPerBlock = threadsPerBlockSize_bres_calc;
+    totalThreadNumber = threadsPerBlock * blocksPerGrid;
+
+    printf("nshared %d, nblocks %d\n", dynamicSharedMemorySize, blocksPerGrid);
+    
+    kernelPointer = getKernel("bres_calc_kernel");
+    //op_fetch_data(opDat1.dat);
+    //printf("BRES_CALC_kernel_retrieved\n");
+    //for(long i = 0; i < 2*721801; ++i) {
+    //  printf("%f\n", (float) opDat1.dat->data[i]);
+    //}
+    errorCode = clSetKernelArg(kernelPointer,0,sizeof(cl_mem ),&opDat1.data_d);
+    errorCode = errorCode | clSetKernelArg(kernelPointer,1,sizeof(cl_mem ),&opDat3.data_d);
+    errorCode = errorCode | clSetKernelArg(kernelPointer,2,sizeof(cl_mem ),&opDat4.data_d);
+    errorCode = errorCode | clSetKernelArg(kernelPointer,3,sizeof(cl_mem ),&opDat5.data_d);
+    errorCode = errorCode | clSetKernelArg(kernelPointer,4,sizeof(cl_mem ),&opDat6.data_d);
+    errorCode = errorCode | clSetKernelArg(kernelPointer,5,sizeof(cl_mem ),&planRet -> ind_maps[0]);
+    errorCode = errorCode | clSetKernelArg(kernelPointer,6,sizeof(cl_mem ),&planRet -> ind_maps[1]);
+    errorCode = errorCode | clSetKernelArg(kernelPointer,7,sizeof(cl_mem ),&planRet -> ind_maps[2]);
+    errorCode = errorCode | clSetKernelArg(kernelPointer,8,sizeof(cl_mem ),&planRet -> ind_maps[3]);
+    errorCode = errorCode | clSetKernelArg(kernelPointer,9,sizeof(cl_mem ),&planRet -> loc_maps[0]);
+    errorCode = errorCode | clSetKernelArg(kernelPointer,10,sizeof(cl_mem ),&planRet -> loc_maps[1]);
+    errorCode = errorCode | clSetKernelArg(kernelPointer,11,sizeof(cl_mem ),&planRet -> loc_maps[2]);
+    errorCode = errorCode | clSetKernelArg(kernelPointer,12,sizeof(cl_mem ),&planRet -> loc_maps[3]);
+    errorCode = errorCode | clSetKernelArg(kernelPointer,13,sizeof(cl_mem ),&planRet -> loc_maps[4]);
+    errorCode = errorCode | clSetKernelArg(kernelPointer,14,sizeof(cl_mem ),&planRet -> ind_sizes);
+    errorCode = errorCode | clSetKernelArg(kernelPointer,15,sizeof(cl_mem ),&planRet -> ind_offs);
+    errorCode = errorCode | clSetKernelArg(kernelPointer,16,sizeof(cl_mem ),&planRet -> blkmap);
+    errorCode = errorCode | clSetKernelArg(kernelPointer,17,sizeof(cl_mem ),&planRet -> offset);
+    errorCode = errorCode | clSetKernelArg(kernelPointer,18,sizeof(cl_mem ),&planRet -> nelems);
+    errorCode = errorCode | clSetKernelArg(kernelPointer,19,sizeof(cl_mem ),&planRet -> nthrcol);
+    errorCode = errorCode | clSetKernelArg(kernelPointer,20,sizeof(cl_mem ),&planRet -> thrcol);
+    errorCode = errorCode | clSetKernelArg(kernelPointer,21,sizeof(int ),&blockOffset);
+    //errorCode = errorCode | clSetKernelArg(kernelPointer,22,sizeof(cl_mem ),&dynamicSharedMemorySize);
+    errorCode = errorCode | clSetKernelArg(kernelPointer,22,dynamicSharedMemorySize,NULL);
+    errorCode = errorCode | clSetKernelArg(kernelPointer,23,sizeof(cl_mem ),&gm1_d);
+    errorCode = errorCode | clSetKernelArg(kernelPointer,24,sizeof(cl_mem ),&qinf_d);
+    errorCode = errorCode | clSetKernelArg(kernelPointer,25,sizeof(cl_mem ),&eps_d);
+    assert_m(errorCode == CL_SUCCESS,"Error setting OpenCL kernel arguments bres_calc");
+    //printf("BRES_CALC_arguments_set\m");
+    errorCode = clEnqueueNDRangeKernel(cqCommandQueue,kernelPointer,1,NULL,&totalThreadNumber,&threadsPerBlock,0,NULL,&event);
+    assert_m(errorCode == CL_SUCCESS,"Error executing OpenCL kernel bres_calc");
+    //printf("BRES_CALC_kernel_executed\n");
+    errorCode = clFinish(cqCommandQueue);
+    assert_m(errorCode == CL_SUCCESS,"Error completing device command queue");
+    //printf("BRES_CALC_command_queue_completed\n");
+    blockOffset += blocksPerGrid;
+  }
+}
+

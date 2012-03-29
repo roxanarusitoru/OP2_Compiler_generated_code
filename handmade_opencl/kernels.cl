@@ -1,0 +1,1 @@
+kernels_single.working_coalescing.cl

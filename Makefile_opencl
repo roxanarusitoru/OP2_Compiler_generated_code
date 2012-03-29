@@ -1,0 +1,25 @@
+
+OP2_INC		= -I$(OP2_INSTALL_PATH)/c/include
+OP2_LIB		= -L$(OP2_INSTALL_PATH)/c/lib
+
+ifdef AMDAPPSDKROOT
+  OPENCL    :=$(AMDAPPSDKROOT)
+endif
+ifdef CUDA_HOME
+  OPENCL    :=$(CUDA_HOME)
+endif
+
+export OPENCL
+OPENCL_INC	:= -I$(OPENCL)/include -I$(OP2_INSTALL_PATH)/c/include -I
+OPENCL_LIB  := -L$(OPENCL)/lib64
+OCCLIB			:= -L/usr/lib6 - L$(OPENCL)/lib/x86_64 -lOpenCL
+OCLINC			:= -I$(OP2_INSTALL_PATH)/c/include -I. $(INC)
+
+EXEC 			= airfoil_opencl
+
+CPP				= g++
+CPPFLAGS 	= -g -fPIC -DUNIX -Wall
+
+all: airfoil_opencl
+
+airfoil_opencl: rose_airfoil_opencl.cpp rose_opencl_code_opencl.cpp Makefile
