@@ -75,7 +75,7 @@ cl_mem g_const_d;
 #include "op_lib_tuner.h"
 #include "op_opencl_rt_support.h"
 
-#define DIAGNOSTIC 1
+//#define DIAGNOSTIC 1
 
 //
 // OP header file

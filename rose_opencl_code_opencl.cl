@@ -3,6 +3,7 @@
 #define ZERO_float 0.0f
 #pragma OPENCL EXTENSION cl_intel_printf : enable
 __kernel void ReductionFloat4(__global float *volatile reductionResult,__private float inputValue,__private int reductionOperation,__local float *sharedFloat4)
+//inline void ReductionFloat4(__global float volatile *reductionResult, float inputValue, int reductionOperation, __local float *sharedFloat4)
 {
   __local float *volatile volatileSharedFloat4;
   int i1;
@@ -622,7 +623,7 @@ __kernel void update_kernel(__global float *opDat1,__global float *opDat2,__glob
   float opDat1Local[4];
   float opDat2Local[4];
   float opDat3Local[4];
-  __local char *sharedPointer_update;
+  __local float *sharedPointer_update;
   float opDat5Local[1];
   __local float reductionTemporaryArray5[2048];
   int i1;
@@ -668,3 +669,75 @@ __kernel void update_kernel(__global float *opDat1,__global float *opDat2,__glob
     ReductionFloat4(&reductionArrayDevice5[i1 + get_group_id(0) * 1],opDat5Local[i1],0,reductionTemporaryArray5);
   }
 }
+
+/*
+__kernel void update_kernel(
+  __global float *opDat1,
+  __global float *opDat2,
+  __global float *opDat3,
+  __global float *opDat4,
+  __global float *reductionArrayDevice5,
+  int   sharedMemoryOffset,
+  int   setSize,
+  __local  float *shared_update ) {
+
+  float opDat1Local[4];
+  float opDat2Local[4];
+  float opDat3Local[4];
+  float opDat5Local[1];
+  int i1;
+  int i2;
+
+  for (i1 = 0; i1 < 1; ++i1) 
+    opDat5Local[i1] = 0.00000F;
+
+
+  int   tid = get_local_id(0)%OP_WARPSIZE;
+
+  __local float *sharedPointer_update =  shared_update+ sharedMemoryOffset *(get_local_id(0)/OP_WARPSIZE)/sizeof(float);
+
+  // process set elements
+  for (int n=get_global_id(0); n<setSize; n+=get_global_size(0)) {
+
+    int offset = n - tid;
+    int nelems = MIN(OP_WARPSIZE,setSize-offset);
+
+    // copy data into shared memory, then into local
+    for (int m=0; m<4; m++)
+      sharedPointer_update[tid+m*nelems] = opDat1[tid+m*nelems+offset*4];
+
+    for (int m=0; m<4; m++)
+      opDat1Local[m] = sharedPointer_update[m+tid*4];
+
+    for (int m=0; m<4; m++)
+      sharedPointer_update[tid+m*nelems] = opDat3[tid+m*nelems+offset*4];
+
+    for (int m=0; m<4; m++)
+      opDat3Local[m] = sharedPointer_update[m+tid*4];
+
+
+    // user-supplied kernel call
+    update_modified( opDat1Local,
+            opDat2Local,
+            opDat3Local,
+            opDat4+n,
+            opDat5Local );
+    // copy back into shared memory, then to device
+    for (int m=0; m<4; m++)
+      sharedPointer_update[m+tid*4] = opDat2Local[m];
+
+    for (int m=0; m<4; m++)
+      opDat2[tid+m*nelems+offset*4] = sharedPointer_update[tid+m*nelems];
+
+    for (int m=0; m<4; m++)
+      sharedPointer_update[m+tid*4] = opDat3Local[m];
+
+    for (int m=0; m<4; m++)
+      opDat3[tid+m*nelems+offset*4] = sharedPointer_update[tid+m*nelems];
+
+
+  }
+
+  for(int d=0; d<1; d++)
+    ReductionFloat4(&reductionArrayDevice5[d+get_group_id(0)*1],opDat5Local[d],0, shared_update);
+}*/

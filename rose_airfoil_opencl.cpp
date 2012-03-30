@@ -82,7 +82,7 @@ void dump_array( op_dat dat, const char *file ) {
   print_array( ( float *) dat->data, dat->set->size*dat->dim, file );
 }
 
-#define DIAGNOSTIC 1
+//#define DIAGNOSTIC 1
 
 int main(int argc,char *argv[])
 {

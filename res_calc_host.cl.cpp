@@ -43,6 +43,8 @@ void res_calc_host(const char *userSubroutine,op_set set,op_arg opDat1,op_arg op
   indirectionDescriptorArray[7] = 3;
   planRet = op_plan_get(userSubroutine,set,setPartitionSize_res_calc,8,opDatArray,4,indirectionDescriptorArray);
   //printf("RES_CALC_plan_retrieved\n");
+  double cpu_t1, cpu_t2, wall_t1, wall_t2;
+  op_timers(&cpu_t1, &wall_t1);
   blockOffset = 0;
   for (i3 = 0; i3 < planRet -> ncolors; ++i3) {
     blocksPerGrid = planRet -> ncolblk[i3];
@@ -87,7 +89,26 @@ void res_calc_host(const char *userSubroutine,op_set set,op_arg opDat1,op_arg op
     errorCode = clFinish(cqCommandQueue);
     assert_m(errorCode == CL_SUCCESS,"Error completing device command queue");
     //printf("RES_CALC_command_queue_completed");
+#ifdef PROFILE
+    cl_ulong tqueue, tsubmit, tstart, tend, telapsed;
+    ciErrNum = clGetEventProfilingInfo( ceEvent, CL_PROFILING_COMMAND_QUEUED, sizeof(cl_ulong), &tqueue, NULL );
+    ciErrNum |= clGetEventProfilingInfo( ceEvent, CL_PROFILING_COMMAND_SUBMIT, sizeof(cl_ulong), &tsubmit, NULL );
+    ciErrNum |= clGetEventProfilingInfo( ceEvent, CL_PROFILING_COMMAND_START, sizeof(cl_ulong), &tstart, NULL );
+    ciErrNum |= clGetEventProfilingInfo( ceEvent, CL_PROFILING_COMMAND_END, sizeof(cl_ulong), &tend, NULL );
+    assert_m( ciErrNum == CL_SUCCESS, "error getting profiling info" );
+    OP_kernels[2].queue_time      += (tsubmit - tqueue);
+    OP_kernels[2].wait_time       += (tstart - tsubmit);
+    OP_kernels[2].execution_time  += (tend - tstart);
+#endif
+
     blockOffset += blocksPerGrid;
   }
+  op_timers(&cpu_t2, &wall_t2);
+  op_timing_realloc(2);
+  OP_kernels[2].name       = userSubroutine;
+  OP_kernels[2].count     += 1;
+  OP_kernels[2].time      += wall_t2 - wall_t1;
+  OP_kernels[2].transfer  += planRet->transfer;
+  OP_kernels[2].transfer2 += planRet->transfer2;
 }
 
