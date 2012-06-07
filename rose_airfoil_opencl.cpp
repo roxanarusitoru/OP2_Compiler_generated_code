@@ -38,17 +38,11 @@
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
-
-#include <CL/cl.h>
 //
 // OP header file
 //
-#include "op_lib_tuner.h"
-#include "op_opencl_rt_support.h"
-
-//#include "op_lib_cpp.h"
-//#include "op_lib.h"
-//#include "op_seq.h"
+#include "op_lib_cpp.h"
+#include "real.h"
 //
 // Variables referenced in kernels with global scope
 //
@@ -62,27 +56,6 @@ void bres_calc_host(const char *userSubroutine,op_set set,op_arg opDat1,op_arg o
 void res_calc_host(const char *userSubroutine,op_set set,op_arg opDat1,op_arg opDat2,op_arg opDat3,op_arg opDat4,op_arg opDat5,op_arg opDat6,op_arg opDat7,op_arg opDat8);
 void save_soln_host(const char *userSubroutine,op_set set,op_arg opDat1,op_arg opDat2);
 void update_host(const char *userSubroutine,op_set set,op_arg opDat1,op_arg opDat2,op_arg opDat3,op_arg opDat4,op_arg opDat5);
-
-// 
-// Debugging methods
-//
-void print_array( float *array, int len, const char *file ) {
-  FILE *flog;
-  flog = fopen( file, "w" );
-  for( int i=0; i<len; ++i ) {
-    fprintf( flog, "%f\n", array[i] );
-  }
-  fclose( flog );
-}
-
-void dump_array( op_dat dat, const char *file ) {
-  printf("Dumping array %s\n", file);
-  op_fetch_data( dat );
-  printf("%s with size %d\n", file, dat->set->size*dat->dim);
-  print_array( ( float *) dat->data, dat->set->size*dat->dim, file );
-}
-
-//#define DIAGNOSTIC 1
 
 int main(int argc,char *argv[])
 {
@@ -205,100 +178,27 @@ int main(int argc,char *argv[])
   op_diagnostic_output();
 // main time-marching loop
   niter = 1000;
-//  niter = 1;
   for (int iter = 1; iter <= niter; iter++) {
 //  save old flow solution
-#ifdef DIAGNOSTIC
-  dump_array(p_q, "p_q_iter_before");
-  dump_array(p_qold, "p_q_old_iter_before");
-#endif
     save_soln_host("save_soln_modified",cells,op_arg_dat(p_q,(-1), OP_ID,4,"float",OP_READ),op_arg_dat(p_qold,(-1), OP_ID,4,"float",OP_WRITE));
-#ifdef DIAGNOSTIC
-  dump_array(p_q, "p_q_iter_after");
-  dump_array(p_qold, "p_q_old_iter_after");
-#endif
-
 //  predictor/corrector update loop
     for (int k = 0; k < 2; k++) {
-//    for (int k = 0; k < 1; k++) {
 //    calculate area/timstep
       adt_calc_host("adt_calc_modified",cells,op_arg_dat(p_x,0,pcell,2,"float",OP_READ),op_arg_dat(p_x,1,pcell,2,"float",OP_READ),op_arg_dat(p_x,2,pcell,2,"float",OP_READ),op_arg_dat(p_x,3,pcell,2,"float",OP_READ),op_arg_dat(p_q,(-1), OP_ID,4,"float",OP_READ),op_arg_dat(p_adt,(-1), OP_ID,1,"float",OP_WRITE));
-#ifdef DIAGNOSTIC
-    if (iter==1 && k==0) {
-      dump_array( p_adt, "p_adt0" );
-      dump_array( p_q, "p_q_after_adt_calc0");
-    }
-    if (iter==1 && k==1) {
-      dump_array( p_adt, "p_adt1" );
-      dump_array( p_q, "p_q_after_adt_calc1");
-    }
-#endif
-
 //    calculate flux residual
       res_calc_host("res_calc_modified",edges,op_arg_dat(p_x,0,pedge,2,"float",OP_READ),op_arg_dat(p_x,1,pedge,2,"float",OP_READ),op_arg_dat(p_q,0,pecell,4,"float",OP_READ),op_arg_dat(p_q,1,pecell,4,"float",OP_READ),op_arg_dat(p_adt,0,pecell,1,"float",OP_READ),op_arg_dat(p_adt,1,pecell,1,"float",OP_READ),op_arg_dat(p_res,0,pecell,4,"float",OP_INC),op_arg_dat(p_res,1,pecell,4,"float",OP_INC));
-
-#ifdef DIAGNOSTIC
-    if (iter==1 && k==0) {
-      dump_array( p_res, "p_res0" );
-      dump_array( p_q, "p_q_after_res_calc0");
-    }
-    if (iter==1 && k==1) {
-      dump_array( p_res, "p_res1" );
-      dump_array( p_q, "p_q_after_res_calc1");
-    }
-#endif
-#ifdef DIAGNOSTIC
-  if (iter == 1 && k == 0) {
-    dump_array(p_x, "p_x_after_res_calc0");
-    dump_array(p_adt, "p_adt_after_res_calc0");
-    dump_array(p_bound, "p_bound_after_res_calc0");
-  }
-  if (iter == 1 && k == 0) {
-    dump_array(p_x, "p_x_after_res_calc1");
-    dump_array(p_adt, "p_adt_after_res_calc1");
-    dump_array(p_bound, "p_bound_after_res_calc1");
-  }
-#endif
-     bres_calc_host("bres_calc_modified",bedges,op_arg_dat(p_x,0,pbedge,2,"float",OP_READ),op_arg_dat(p_x,1,pbedge,2,"float",OP_READ),op_arg_dat(p_q,0,pbecell,4,"float",OP_READ),op_arg_dat(p_adt,0,pbecell,1,"float",OP_READ),op_arg_dat(p_res,0,pbecell,4,"float",OP_INC),op_arg_dat(p_bound,(-1), OP_ID,1,"int",OP_READ));
-
-#ifdef DIAGNOSTIC
-    if (iter==1 && k==0) {
-      dump_array( p_res, "p_res_a0" );
-    }
-    if (iter==1 && k==1) {
-      dump_array( p_res, "p_res_a1" );
-    }
-#endif
-
-
+      bres_calc_host("bres_calc_modified",bedges,op_arg_dat(p_x,0,pbedge,2,"float",OP_READ),op_arg_dat(p_x,1,pbedge,2,"float",OP_READ),op_arg_dat(p_q,0,pbecell,4,"float",OP_READ),op_arg_dat(p_adt,0,pbecell,1,"float",OP_READ),op_arg_dat(p_res,0,pbecell,4,"float",OP_INC),op_arg_dat(p_bound,(-1), OP_ID,1,"int",OP_READ));
 //    update flow field
       rms = 0.0;
       update_host("update_modified",cells,op_arg_dat(p_qold,(-1), OP_ID,4,"float",OP_READ),op_arg_dat(p_q,(-1), OP_ID,4,"float",OP_WRITE),op_arg_dat(p_res,(-1), OP_ID,4,"float",OP_RW),op_arg_dat(p_adt,(-1), OP_ID,1,"float",OP_READ),op_arg_gbl(&rms,1,"float",OP_INC));
-
-#ifdef DIAGNOSTIC
-      if (iter==1 && k==0) {
-        dump_array(p_res, "p_res_update_0");
-        dump_array(p_q,"p_q_update_0");
-        printf("rms_1_0 %f\n", rms);
-      }
-      if (iter==1 && k==1) {
-        dump_array(p_res, "p_res_update_1");
-        dump_array(p_q,"p_q_update_1");
-        printf("rms_1_1 %f\n", rms);
-      }
-#endif
-
-
     }
-//    printf("RMS BEFORE %f\n", rms);
 //  print iteration history
     rms = (sqrt((rms / ((float )ncell))));
     if ((iter % 100) == 0) 
       printf(" %d  %10.5e \n",iter,rms);
   }
-  dump_array(p_q,"p_q");
-//  for (int ll = 0; ll < (4 * ncell); ll++) 
-//    printf("%lf\n",q[ll]);
+  for (int ll = 0; ll < (4 * ncell); ll++) 
+    printf("%lf\n",q[ll]);
   op_timing_output();
   return 0;
 }

@@ -1,3 +1,5 @@
+#include <CL/cl.h>
+#include "op_lib_cpp.h"
 extern float alpha;
 extern float cfl;
 extern float eps;
@@ -103,7 +105,7 @@ __kernel void ReductionFloat4(__global float *volatile reductionResult,__private
   }
 }
 
-inline void adt_calc_modified(float *x1,float *x2,float *x3,float *x4,float *q,float *adt,float gam,float gm1,float cfl)
+inline void adt_calc_modified(__local float *x1,__local float *x2,__local float *x3,__local float *x4,__global float *q,__global float *adt,__constant float *gam,__constant float *gm1,__constant float *cfl)
 {
   float dx;
   float dy;
@@ -130,24 +132,24 @@ inline void adt_calc_modified(float *x1,float *x2,float *x3,float *x4,float *q,f
    *adt = ( *adt / cfl);
 }
 
-__kernel void adt_calc_kernel(__global float *opDat1,__global float *opDat5,__global float *opDat6,__global int *ind_maps1,__global short *mappingArray1,__global short *mappingArray2,__global short *mappingArray3,__global short *mappingArray4,__global int *pindSizes,__global int *pindOffs,__global int *pblkMap,__global int *poffset,__global int *pnelems,__global int *pnthrcol,__global int *pthrcol,__private int blockOffset,__local int shared_adt_calc,__constant float gam,__constant float gm1,__constant float cfl)
+__kernel void adt_calc_kernel(__global float *opDat1,__global float *opDat5,__global float *opDat6,__global int *ind_maps1,__global short *mappingArray1,__global short *mappingArray2,__global short *mappingArray3,__global short *mappingArray4,__global int *pindSizes,__global int *pindOffs,__global int *pblkMap,__global int *poffset,__global int *pnelems,__global int *pnthrcol,__global int *pthrcol,__private int blockOffset,__local float *shared_adt_calc,__constant float *gam,__constant float *gm1,__constant float *cfl)
 {
   __local int sharedMemoryOffset;
   __local int numberOfActiveThreads;
-  __local int nbytes;
+  int nbytes;
   int blockID;
   int i1;
-  __local int *opDat1IndirectionMap;
+  __global  int* __local  opDat1IndirectionMap;
   __local int opDat1SharedIndirectionSize;
-  __local float *opDat1SharedIndirection;
+  __local  float * __local  opDat1SharedIndirection;
   if (get_local_id(0) == 0) {
-    blockID = pblkMap[get_global_size(0) + blockOffset];
+    blockID = pblkMap[get_group_id(0) + blockOffset];
     numberOfActiveThreads = pnelems[blockID];
     sharedMemoryOffset = poffset[blockID];
     opDat1SharedIndirectionSize = pindSizes[0 + blockID * 1];
     opDat1IndirectionMap = ind_maps1 + pindOffs[0 + blockID * 1];
     nbytes = 0;
-    opDat1SharedIndirection = ((float *)(&shared_adt_calc[nbytes]));
+    opDat1SharedIndirection = &shared_adt_calc[nbytes / sizeof(float )];
   }
   barrier(CLK_LOCAL_MEM_FENCE);
   for (i1 = get_local_id(0); i1 < opDat1SharedIndirectionSize * 2; i1 += get_local_size(0)) {
@@ -159,7 +161,6 @@ __kernel void adt_calc_kernel(__global float *opDat1,__global float *opDat5,__gl
   }
 }
 
-/*
 void adt_calc_host(const char *userSubroutine,op_set set,op_arg opDat1,op_arg opDat2,op_arg opDat3,op_arg opDat4,op_arg opDat5,op_arg opDat6)
 {
   size_t blocksPerGrid;
@@ -187,12 +188,18 @@ void adt_calc_host(const char *userSubroutine,op_set set,op_arg opDat1,op_arg op
   indirectionDescriptorArray[4] = -1;
   indirectionDescriptorArray[5] = -1;
   planRet = op_plan_get(userSubroutine,set,setPartitionSize_adt_calc,6,opDatArray,1,indirectionDescriptorArray);
-  totalThreadNumber = threadsPerBlock * blocksPerGrid;
+  cl_mem gam_d;
+  gam_d = op_allocate_constant(&gam,sizeof(float ));
+  cl_mem gm1_d;
+  gm1_d = op_allocate_constant(&gm1,sizeof(float ));
+  cl_mem cfl_d;
+  cfl_d = op_allocate_constant(&cfl,sizeof(float ));
   blockOffset = 0;
   for (i3 = 0; i3 < planRet -> ncolors; ++i3) {
     blocksPerGrid = planRet -> ncolblk[i3];
     dynamicSharedMemorySize = planRet -> nshared;
     threadsPerBlock = threadsPerBlockSize_adt_calc;
+    totalThreadNumber = threadsPerBlock * blocksPerGrid;
     kernelPointer = getKernel("adt_calc_kernel");
     errorCode = clSetKernelArg(kernelPointer,0,sizeof(cl_mem ),&opDat1.data_d);
     errorCode = errorCode | clSetKernelArg(kernelPointer,1,sizeof(cl_mem ),&opDat5.data_d);
@@ -209,21 +216,21 @@ void adt_calc_host(const char *userSubroutine,op_set set,op_arg opDat1,op_arg op
     errorCode = errorCode | clSetKernelArg(kernelPointer,12,sizeof(cl_mem ),&planRet -> nelems);
     errorCode = errorCode | clSetKernelArg(kernelPointer,13,sizeof(cl_mem ),&planRet -> nthrcol);
     errorCode = errorCode | clSetKernelArg(kernelPointer,14,sizeof(cl_mem ),&planRet -> thrcol);
-    errorCode = errorCode | clSetKernelArg(kernelPointer,15,sizeof(cl_mem ),&blockOffset);
-    errorCode = errorCode | clSetKernelArg(kernelPointer,16,sizeof(cl_mem ),&dynamicSharedMemorySize);
-    errorCode = errorCode | clSetKernelArg(kernelPointer,17,sizeof(cl_mem ),&gam);
-    errorCode = errorCode | clSetKernelArg(kernelPointer,18,sizeof(cl_mem ),&gm1);
-    errorCode = errorCode | clSetKernelArg(kernelPointer,19,sizeof(cl_mem ),&cfl);
+    errorCode = errorCode | clSetKernelArg(kernelPointer,15,sizeof(int ),&blockOffset);
+    errorCode = errorCode | clSetKernelArg(kernelPointer,16,dynamicSharedMemorySize,NULL);
+    errorCode = errorCode | clSetKernelArg(kernelPointer,17,sizeof(cl_mem ),&gam_d);
+    errorCode = errorCode | clSetKernelArg(kernelPointer,18,sizeof(cl_mem ),&gm1_d);
+    errorCode = errorCode | clSetKernelArg(kernelPointer,19,sizeof(cl_mem ),&cfl_d);
     assert_m(errorCode == CL_SUCCESS,"Error setting OpenCL kernel arguments");
-    errorCode = clEnqueueNDRangeKernel(commandQueue,kernelPointer,1,0,&totalThreadNumber,&threadsPerBlock,0,0,&event);
+    errorCode = clEnqueueNDRangeKernel(cqCommandQueue,kernelPointer,1,NULL,&totalThreadNumber,&threadsPerBlock,0,NULL,&event);
     assert_m(errorCode == CL_SUCCESS,"Error executing OpenCL kernel");
-    errorCode = clFinish(commandQueue);
+    errorCode = clFinish(cqCommandQueue);
     assert_m(errorCode == CL_SUCCESS,"Error completing device command queue");
     blockOffset += blocksPerGrid;
   }
-}*/
+}
 
-inline void bres_calc_modified(float *x1,float *x2,float *q1,float *adt1,float *res1,int *bound,float gm1,float qinf[4UL],float eps)
+inline void bres_calc_modified(__local float *x1,__local float *x2,__local float *q1,__local float *adt1,float *res1,__global int *bound,__constant float *gm1,__constant float (*qinf)[4UL],__constant float *eps)
 {
   float dx;
   float dy;
@@ -259,33 +266,33 @@ inline void bres_calc_modified(float *x1,float *x2,float *q1,float *adt1,float *
   }
 }
 
-__kernel void bres_calc_kernel(__global float *opDat1,__global float *opDat3,__global float *opDat4,__global float *opDat5,__global int *opDat6,__global int *ind_maps1,__global int *ind_maps3,__global int *ind_maps4,__global int *ind_maps5,__global short *mappingArray1,__global short *mappingArray2,__global short *mappingArray3,__global short *mappingArray4,__global short *mappingArray5,__global int *pindSizes,__global int *pindOffs,__global int *pblkMap,__global int *poffset,__global int *pnelems,__global int *pnthrcol,__global int *pthrcol,__private int blockOffset,__local int shared_bres_calc,__constant float gm1,__constant float qinf[4UL],__constant float eps)
+__kernel void bres_calc_kernel(__global float *opDat1,__global float *opDat3,__global float *opDat4,__global float *opDat5,__global int *opDat6,__global int *ind_maps1,__global int *ind_maps3,__global int *ind_maps4,__global int *ind_maps5,__global short *mappingArray1,__global short *mappingArray2,__global short *mappingArray3,__global short *mappingArray4,__global short *mappingArray5,__global int *pindSizes,__global int *pindOffs,__global int *pblkMap,__global int *poffset,__global int *pnelems,__global int *pnthrcol,__global int *pthrcol,__private int blockOffset,__local float *shared_bres_calc,__constant float *gm1,__constant float (*qinf)[4UL],__constant float *eps)
 {
   float opDat5Local[4];
   __local int sharedMemoryOffset;
   __local int numberOfActiveThreads;
-  __local int nbytes;
+  int nbytes;
   int blockID;
   int i1;
-  __local int *opDat1IndirectionMap;
-  __local int *opDat3IndirectionMap;
-  __local int *opDat4IndirectionMap;
-  __local int *opDat5IndirectionMap;
+  __global  int* __local  opDat1IndirectionMap;
+  __global  int* __local  opDat3IndirectionMap;
+  __global  int* __local  opDat4IndirectionMap;
+  __global  int* __local  opDat5IndirectionMap;
   __local int opDat1SharedIndirectionSize;
   __local int opDat3SharedIndirectionSize;
   __local int opDat4SharedIndirectionSize;
   __local int opDat5SharedIndirectionSize;
-  __local float *opDat1SharedIndirection;
-  __local float *opDat3SharedIndirection;
-  __local float *opDat4SharedIndirection;
-  __local float *opDat5SharedIndirection;
+  __local  float * __local  opDat1SharedIndirection;
+  __local  float * __local  opDat3SharedIndirection;
+  __local  float * __local  opDat4SharedIndirection;
+  __local  float * __local  opDat5SharedIndirection;
   __local int numOfColours;
   __local int numberOfActiveThreadsCeiling;
   int colour1;
   int colour2;
   int i2;
   if (get_local_id(0) == 0) {
-    blockID = pblkMap[get_global_size(0) + blockOffset];
+    blockID = pblkMap[get_group_id(0) + blockOffset];
     numberOfActiveThreads = pnelems[blockID];
     numberOfActiveThreadsCeiling = get_local_size(0) * (1 + (numberOfActiveThreads - 1) / get_local_size(0));
     numOfColours = pnthrcol[blockID];
@@ -299,13 +306,13 @@ __kernel void bres_calc_kernel(__global float *opDat1,__global float *opDat3,__g
     opDat4IndirectionMap = ind_maps4 + pindOffs[2 + blockID * 4];
     opDat5IndirectionMap = ind_maps5 + pindOffs[3 + blockID * 4];
     nbytes = 0;
-    opDat1SharedIndirection = ((float *)(&shared_bres_calc[nbytes]));
+    opDat1SharedIndirection = &shared_bres_calc[nbytes / sizeof(float )];
     nbytes += ROUND_UP(opDat1SharedIndirectionSize * (sizeof(float ) * 2));
-    opDat3SharedIndirection = ((float *)(&shared_bres_calc[nbytes]));
+    opDat3SharedIndirection = &shared_bres_calc[nbytes / sizeof(float )];
     nbytes += ROUND_UP(opDat3SharedIndirectionSize * (sizeof(float ) * 4));
-    opDat4SharedIndirection = ((float *)(&shared_bres_calc[nbytes]));
+    opDat4SharedIndirection = &shared_bres_calc[nbytes / sizeof(float )];
     nbytes += ROUND_UP(opDat4SharedIndirectionSize * (sizeof(float ) * 1));
-    opDat5SharedIndirection = ((float *)(&shared_bres_calc[nbytes]));
+    opDat5SharedIndirection = &shared_bres_calc[nbytes / sizeof(float )];
   }
   barrier(CLK_LOCAL_MEM_FENCE);
   for (i1 = get_local_id(0); i1 < opDat1SharedIndirectionSize * 2; i1 += get_local_size(0)) {
@@ -339,11 +346,11 @@ __kernel void bres_calc_kernel(__global float *opDat1,__global float *opDat3,__g
       barrier(CLK_LOCAL_MEM_FENCE);
     }
   }
-  for (i1 = get_local_id(0); i1 < opDat5SharedIndirectionSize * 4; i1 += get_global_id(0)) {
+  for (i1 = get_local_id(0); i1 < opDat5SharedIndirectionSize * 4; i1 += get_local_size(0)) {
     opDat5[i1 % 4 + opDat5IndirectionMap[i1 / 4] * 4] += opDat5SharedIndirection[i1];
   }
 }
-/*
+
 void bres_calc_host(const char *userSubroutine,op_set set,op_arg opDat1,op_arg opDat2,op_arg opDat3,op_arg opDat4,op_arg opDat5,op_arg opDat6)
 {
   size_t blocksPerGrid;
@@ -371,12 +378,18 @@ void bres_calc_host(const char *userSubroutine,op_set set,op_arg opDat1,op_arg o
   indirectionDescriptorArray[4] = 3;
   indirectionDescriptorArray[5] = -1;
   planRet = op_plan_get(userSubroutine,set,setPartitionSize_bres_calc,6,opDatArray,4,indirectionDescriptorArray);
-  totalThreadNumber = threadsPerBlock * blocksPerGrid;
+  cl_mem gm1_d;
+  gm1_d = op_allocate_constant(&gm1,sizeof(float ));
+  cl_mem qinf_d;
+  qinf_d = op_allocate_constant(&qinf,4 * sizeof(float));
+  cl_mem eps_d;
+  eps_d = op_allocate_constant(&eps,sizeof(float ));
   blockOffset = 0;
   for (i3 = 0; i3 < planRet -> ncolors; ++i3) {
     blocksPerGrid = planRet -> ncolblk[i3];
     dynamicSharedMemorySize = planRet -> nshared;
     threadsPerBlock = threadsPerBlockSize_bres_calc;
+    totalThreadNumber = threadsPerBlock * blocksPerGrid;
     kernelPointer = getKernel("bres_calc_kernel");
     errorCode = clSetKernelArg(kernelPointer,0,sizeof(cl_mem ),&opDat1.data_d);
     errorCode = errorCode | clSetKernelArg(kernelPointer,1,sizeof(cl_mem ),&opDat3.data_d);
@@ -399,21 +412,21 @@ void bres_calc_host(const char *userSubroutine,op_set set,op_arg opDat1,op_arg o
     errorCode = errorCode | clSetKernelArg(kernelPointer,18,sizeof(cl_mem ),&planRet -> nelems);
     errorCode = errorCode | clSetKernelArg(kernelPointer,19,sizeof(cl_mem ),&planRet -> nthrcol);
     errorCode = errorCode | clSetKernelArg(kernelPointer,20,sizeof(cl_mem ),&planRet -> thrcol);
-    errorCode = errorCode | clSetKernelArg(kernelPointer,21,sizeof(cl_mem ),&blockOffset);
-    errorCode = errorCode | clSetKernelArg(kernelPointer,22,sizeof(cl_mem ),&dynamicSharedMemorySize);
-    errorCode = errorCode | clSetKernelArg(kernelPointer,23,sizeof(cl_mem ),&gm1);
-    errorCode = errorCode | clSetKernelArg(kernelPointer,24,sizeof(cl_mem ),&qinf);
-    errorCode = errorCode | clSetKernelArg(kernelPointer,25,sizeof(cl_mem ),&eps);
+    errorCode = errorCode | clSetKernelArg(kernelPointer,21,sizeof(int ),&blockOffset);
+    errorCode = errorCode | clSetKernelArg(kernelPointer,22,dynamicSharedMemorySize,NULL);
+    errorCode = errorCode | clSetKernelArg(kernelPointer,23,sizeof(cl_mem ),&gm1_d);
+    errorCode = errorCode | clSetKernelArg(kernelPointer,24,sizeof(cl_mem ),&qinf_d);
+    errorCode = errorCode | clSetKernelArg(kernelPointer,25,sizeof(cl_mem ),&eps_d);
     assert_m(errorCode == CL_SUCCESS,"Error setting OpenCL kernel arguments");
-    errorCode = clEnqueueNDRangeKernel(commandQueue,kernelPointer,1,0,&totalThreadNumber,&threadsPerBlock,0,0,&event);
+    errorCode = clEnqueueNDRangeKernel(cqCommandQueue,kernelPointer,1,NULL,&totalThreadNumber,&threadsPerBlock,0,NULL,&event);
     assert_m(errorCode == CL_SUCCESS,"Error executing OpenCL kernel");
-    errorCode = clFinish(commandQueue);
+    errorCode = clFinish(cqCommandQueue);
     assert_m(errorCode == CL_SUCCESS,"Error completing device command queue");
     blockOffset += blocksPerGrid;
   }
-}*/
+}
 
-inline void res_calc_modified(float *x1,float *x2,float *q1,float *q2,float *adt1,float *adt2,float *res1,float *res2,float gm1,float eps)
+inline void res_calc_modified(__local float *x1,__local float *x2,__local float *q1,__local float *q2,__local float *adt1,__local float *adt2,float *res1,float *res2,__constant float *gm1,__constant float *eps)
 {
   float dx;
   float dy;
@@ -447,34 +460,34 @@ inline void res_calc_modified(float *x1,float *x2,float *q1,float *q2,float *adt
   res2[3] -= f;
 }
 
-__kernel void res_calc_kernel(__global float *opDat1,__global float *opDat3,__global float *opDat5,__global float *opDat7,__global int *ind_maps1,__global int *ind_maps3,__global int *ind_maps5,__global int *ind_maps7,__global short *mappingArray1,__global short *mappingArray2,__global short *mappingArray3,__global short *mappingArray4,__global short *mappingArray5,__global short *mappingArray6,__global short *mappingArray7,__global short *mappingArray8,__global int *pindSizes,__global int *pindOffs,__global int *pblkMap,__global int *poffset,__global int *pnelems,__global int *pnthrcol,__global int *pthrcol,__private int blockOffset,__local int shared_res_calc,__constant float gm1,__constant float eps)
+__kernel void res_calc_kernel(__global float *opDat1,__global float *opDat3,__global float *opDat5,__global float *opDat7,__global int *ind_maps1,__global int *ind_maps3,__global int *ind_maps5,__global int *ind_maps7,__global short *mappingArray1,__global short *mappingArray2,__global short *mappingArray3,__global short *mappingArray4,__global short *mappingArray5,__global short *mappingArray6,__global short *mappingArray7,__global short *mappingArray8,__global int *pindSizes,__global int *pindOffs,__global int *pblkMap,__global int *poffset,__global int *pnelems,__global int *pnthrcol,__global int *pthrcol,__private int blockOffset,__local float *shared_res_calc,__constant float *gm1,__constant float *eps)
 {
   float opDat7Local[4];
   float opDat8Local[4];
   __local int sharedMemoryOffset;
   __local int numberOfActiveThreads;
-  __local int nbytes;
+  int nbytes;
   int blockID;
   int i1;
-  __local int *opDat1IndirectionMap;
-  __local int *opDat3IndirectionMap;
-  __local int *opDat5IndirectionMap;
-  __local int *opDat7IndirectionMap;
+  __global  int* __local  opDat1IndirectionMap;
+  __global  int* __local  opDat3IndirectionMap;
+  __global  int* __local  opDat5IndirectionMap;
+  __global  int* __local  opDat7IndirectionMap;
   __local int opDat1SharedIndirectionSize;
   __local int opDat3SharedIndirectionSize;
   __local int opDat5SharedIndirectionSize;
   __local int opDat7SharedIndirectionSize;
-  __local float *opDat1SharedIndirection;
-  __local float *opDat3SharedIndirection;
-  __local float *opDat5SharedIndirection;
-  __local float *opDat7SharedIndirection;
+  __local  float * __local  opDat1SharedIndirection;
+  __local  float * __local  opDat3SharedIndirection;
+  __local  float * __local  opDat5SharedIndirection;
+  __local  float * __local  opDat7SharedIndirection;
   __local int numOfColours;
   __local int numberOfActiveThreadsCeiling;
   int colour1;
   int colour2;
   int i2;
   if (get_local_id(0) == 0) {
-    blockID = pblkMap[get_global_size(0) + blockOffset];
+    blockID = pblkMap[get_group_id(0) + blockOffset];
     numberOfActiveThreads = pnelems[blockID];
     numberOfActiveThreadsCeiling = get_local_size(0) * (1 + (numberOfActiveThreads - 1) / get_local_size(0));
     numOfColours = pnthrcol[blockID];
@@ -488,13 +501,13 @@ __kernel void res_calc_kernel(__global float *opDat1,__global float *opDat3,__gl
     opDat5IndirectionMap = ind_maps5 + pindOffs[2 + blockID * 4];
     opDat7IndirectionMap = ind_maps7 + pindOffs[3 + blockID * 4];
     nbytes = 0;
-    opDat1SharedIndirection = ((float *)(&shared_res_calc[nbytes]));
+    opDat1SharedIndirection = &shared_res_calc[nbytes / sizeof(float )];
     nbytes += ROUND_UP(opDat1SharedIndirectionSize * (sizeof(float ) * 2));
-    opDat3SharedIndirection = ((float *)(&shared_res_calc[nbytes]));
+    opDat3SharedIndirection = &shared_res_calc[nbytes / sizeof(float )];
     nbytes += ROUND_UP(opDat3SharedIndirectionSize * (sizeof(float ) * 4));
-    opDat5SharedIndirection = ((float *)(&shared_res_calc[nbytes]));
+    opDat5SharedIndirection = &shared_res_calc[nbytes / sizeof(float )];
     nbytes += ROUND_UP(opDat5SharedIndirectionSize * (sizeof(float ) * 1));
-    opDat7SharedIndirection = ((float *)(&shared_res_calc[nbytes]));
+    opDat7SharedIndirection = &shared_res_calc[nbytes / sizeof(float )];
   }
   barrier(CLK_LOCAL_MEM_FENCE);
   for (i1 = get_local_id(0); i1 < opDat1SharedIndirectionSize * 2; i1 += get_local_size(0)) {
@@ -534,11 +547,11 @@ __kernel void res_calc_kernel(__global float *opDat1,__global float *opDat3,__gl
       barrier(CLK_LOCAL_MEM_FENCE);
     }
   }
-  for (i1 = get_local_id(0); i1 < opDat7SharedIndirectionSize * 4; i1 += get_global_id(0)) {
+  for (i1 = get_local_id(0); i1 < opDat7SharedIndirectionSize * 4; i1 += get_local_size(0)) {
     opDat7[i1 % 4 + opDat7IndirectionMap[i1 / 4] * 4] += opDat7SharedIndirection[i1];
   }
 }
-/*
+
 void res_calc_host(const char *userSubroutine,op_set set,op_arg opDat1,op_arg opDat2,op_arg opDat3,op_arg opDat4,op_arg opDat5,op_arg opDat6,op_arg opDat7,op_arg opDat8)
 {
   size_t blocksPerGrid;
@@ -570,12 +583,16 @@ void res_calc_host(const char *userSubroutine,op_set set,op_arg opDat1,op_arg op
   indirectionDescriptorArray[6] = 3;
   indirectionDescriptorArray[7] = 3;
   planRet = op_plan_get(userSubroutine,set,setPartitionSize_res_calc,8,opDatArray,4,indirectionDescriptorArray);
-  totalThreadNumber = threadsPerBlock * blocksPerGrid;
+  cl_mem gm1_d;
+  gm1_d = op_allocate_constant(&gm1,sizeof(float ));
+  cl_mem eps_d;
+  eps_d = op_allocate_constant(&eps,sizeof(float ));
   blockOffset = 0;
   for (i3 = 0; i3 < planRet -> ncolors; ++i3) {
     blocksPerGrid = planRet -> ncolblk[i3];
     dynamicSharedMemorySize = planRet -> nshared;
     threadsPerBlock = threadsPerBlockSize_res_calc;
+    totalThreadNumber = threadsPerBlock * blocksPerGrid;
     kernelPointer = getKernel("res_calc_kernel");
     errorCode = clSetKernelArg(kernelPointer,0,sizeof(cl_mem ),&opDat1.data_d);
     errorCode = errorCode | clSetKernelArg(kernelPointer,1,sizeof(cl_mem ),&opDat3.data_d);
@@ -600,19 +617,19 @@ void res_calc_host(const char *userSubroutine,op_set set,op_arg opDat1,op_arg op
     errorCode = errorCode | clSetKernelArg(kernelPointer,20,sizeof(cl_mem ),&planRet -> nelems);
     errorCode = errorCode | clSetKernelArg(kernelPointer,21,sizeof(cl_mem ),&planRet -> nthrcol);
     errorCode = errorCode | clSetKernelArg(kernelPointer,22,sizeof(cl_mem ),&planRet -> thrcol);
-    errorCode = errorCode | clSetKernelArg(kernelPointer,23,sizeof(cl_mem ),&blockOffset);
-    errorCode = errorCode | clSetKernelArg(kernelPointer,24,sizeof(cl_mem ),&dynamicSharedMemorySize);
-    errorCode = errorCode | clSetKernelArg(kernelPointer,25,sizeof(cl_mem ),&gm1);
-    errorCode = errorCode | clSetKernelArg(kernelPointer,26,sizeof(cl_mem ),&eps);
+    errorCode = errorCode | clSetKernelArg(kernelPointer,23,sizeof(int ),&blockOffset);
+    errorCode = errorCode | clSetKernelArg(kernelPointer,24,dynamicSharedMemorySize,NULL);
+    errorCode = errorCode | clSetKernelArg(kernelPointer,25,sizeof(cl_mem ),&gm1_d);
+    errorCode = errorCode | clSetKernelArg(kernelPointer,26,sizeof(cl_mem ),&eps_d);
     assert_m(errorCode == CL_SUCCESS,"Error setting OpenCL kernel arguments");
-    errorCode = clEnqueueNDRangeKernel(commandQueue,kernelPointer,1,0,&totalThreadNumber,&threadsPerBlock,0,0,&event);
+    errorCode = clEnqueueNDRangeKernel(cqCommandQueue,kernelPointer,1,NULL,&totalThreadNumber,&threadsPerBlock,0,NULL,&event);
     assert_m(errorCode == CL_SUCCESS,"Error executing OpenCL kernel");
-    errorCode = clFinish(commandQueue);
+    errorCode = clFinish(cqCommandQueue);
     assert_m(errorCode == CL_SUCCESS,"Error completing device command queue");
     blockOffset += blocksPerGrid;
   }
 }
-*/
+
 inline void save_soln_modified(float *q,float *qold)
 {
   for (int n = 0; n < 4; n++) 
@@ -649,7 +666,7 @@ __kernel void save_soln_kernel(__global float *opDat1,__global float *opDat2,int
     }
   }
 }
-/*
+
 void save_soln_host(const char *userSubroutine,op_set set,op_arg opDat1,op_arg opDat2)
 {
   size_t blocksPerGrid;
@@ -673,15 +690,15 @@ void save_soln_host(const char *userSubroutine,op_set set,op_arg opDat1,op_arg o
   errorCode = errorCode | clSetKernelArg(kernelPointer,1,sizeof(cl_mem ),&opDat2.data_d);
   errorCode = errorCode | clSetKernelArg(kernelPointer,2,sizeof(int ),&sharedMemoryOffset);
   errorCode = errorCode | clSetKernelArg(kernelPointer,3,sizeof(int ),&set -> size);
-  errorCode = errorCode | clSetKernelArg(kernelPointer,4,sizeof(size_t ),&dynamicSharedMemorySize);
+  errorCode = errorCode | clSetKernelArg(kernelPointer,4,dynamicSharedMemorySize,NULL);
   assert_m(errorCode == CL_SUCCESS,"Error setting OpenCL kernel arguments");
-  errorCode = clEnqueueNDRangeKernel(commandQueue,kernelPointer,1,0,&totalThreadNumber,&threadsPerBlock,0,0,&event);
+  errorCode = clEnqueueNDRangeKernel(cqCommandQueue,kernelPointer,1,NULL,&totalThreadNumber,&threadsPerBlock,0,NULL,&event);
   assert_m(errorCode == CL_SUCCESS,"Error executing OpenCL kernel");
-  errorCode = clFinish(commandQueue);
+  errorCode = clFinish(cqCommandQueue);
   assert_m(errorCode == CL_SUCCESS,"Error completing device command queue");
-}*/
+}
 
-inline void update_modified(float *qold,float *q,float *res,float *adt,float *rms)
+inline void update_modified(float *qold,float *q,float *res,__global float *adt,float *rms)
 {
   float del;
   float adti;
@@ -742,10 +759,10 @@ __kernel void update_kernel(__global float *opDat1,__global float *opDat2,__glob
     }
   }
   for (i1 = 0; i1 < 1; ++i1) {
-    ReductionFloat4(&reductionArrayDevice5[i1 + get_global_id(0) * 1],opDat5Local[i1],0,reductionTemporaryArray5);
+    ReductionFloat4(&reductionArrayDevice5[i1 + get_group_id(0) * 1],opDat5Local[i1],0,reductionTemporaryArray5);
   }
 }
-/*
+
 void update_host(const char *userSubroutine,op_set set,op_arg opDat1,op_arg opDat2,op_arg opDat3,op_arg opDat4,op_arg opDat5)
 {
   size_t blocksPerGrid;
@@ -779,7 +796,7 @@ void update_host(const char *userSubroutine,op_set set,op_arg opDat1,op_arg opDa
   reallocReductArrays(reductionBytes);
   reductionBytes = 0;
   opDat5.data = OP_reduct_h + reductionBytes;
-  opDat5.data_d = OP_reduct_d + reductionBytes;
+  opDat5.data_d = ((char *)OP_reduct_d) + reductionBytes;
   for (i1 = 0; i1 < blocksPerGrid; ++i1) {
     for (i2 = 0; i2 < 1; ++i2) {
       ((float *)opDat5.data)[i2 + i1 * 1] = 0.00000F;
@@ -792,13 +809,14 @@ void update_host(const char *userSubroutine,op_set set,op_arg opDat1,op_arg opDa
   errorCode = errorCode | clSetKernelArg(kernelPointer,1,sizeof(cl_mem ),&opDat2.data_d);
   errorCode = errorCode | clSetKernelArg(kernelPointer,2,sizeof(cl_mem ),&opDat3.data_d);
   errorCode = errorCode | clSetKernelArg(kernelPointer,3,sizeof(cl_mem ),&opDat4.data_d);
-  errorCode = errorCode | clSetKernelArg(kernelPointer,4,sizeof(int ),&sharedMemoryOffset);
-  errorCode = errorCode | clSetKernelArg(kernelPointer,5,sizeof(int ),&set -> size);
-  errorCode = errorCode | clSetKernelArg(kernelPointer,6,sizeof(size_t ),&dynamicSharedMemorySize);
+  errorCode = errorCode | clSetKernelArg(kernelPointer,4,sizeof(cl_mem ),&opDat5.data_d);
+  errorCode = errorCode | clSetKernelArg(kernelPointer,5,sizeof(int ),&sharedMemoryOffset);
+  errorCode = errorCode | clSetKernelArg(kernelPointer,6,sizeof(int ),&set -> size);
+  errorCode = errorCode | clSetKernelArg(kernelPointer,7,dynamicSharedMemorySize,NULL);
   assert_m(errorCode == CL_SUCCESS,"Error setting OpenCL kernel arguments");
-  errorCode = clEnqueueNDRangeKernel(commandQueue,kernelPointer,1,0,&totalThreadNumber,&threadsPerBlock,0,0,&event);
+  errorCode = clEnqueueNDRangeKernel(cqCommandQueue,kernelPointer,1,NULL,&totalThreadNumber,&threadsPerBlock,0,NULL,&event);
   assert_m(errorCode == CL_SUCCESS,"Error executing OpenCL kernel");
-  errorCode = clFinish(commandQueue);
+  errorCode = clFinish(cqCommandQueue);
   assert_m(errorCode == CL_SUCCESS,"Error completing device command queue");
   mvReductArraysToHost(reductionBytes);
   for (i1 = 0; i1 < blocksPerGrid; ++i1) {
@@ -806,4 +824,4 @@ void update_host(const char *userSubroutine,op_set set,op_arg opDat1,op_arg opDa
       reductionArrayHost5[i2] += ((float *)opDat5.data)[i2 + i1 * 1];
     }
   }
-}*/
+}
