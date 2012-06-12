@@ -1,8 +1,9 @@
-#include <utility>
+//#include <utility>
 #include <CL/cl.h>
 
 //#include "op_lib_tuner.h"
 #include "op_opencl_rt_support.h"
+//#define PROFILE = 1
 
 extern float alpha;
 extern float cfl;
@@ -49,11 +50,11 @@ void save_soln_host(const char *userSubroutine,op_set set,op_arg opDat1,op_arg o
 
 #ifdef PROFILE
   unsigned long tqueue, tsubmit, tstart, tend, telapsed;
-  ciErrNum  = clGetEventProfilingInfo( ceEvent, CL_PROFILING_COMMAND_QUEUED, sizeof(tqueue), &tqueue, NULL );
-  ciErrNum |= clGetEventProfilingInfo( ceEvent, CL_PROFILING_COMMAND_SUBMIT, sizeof(tsubmit), &tsubmit, NULL );
-  ciErrNum |= clGetEventProfilingInfo( ceEvent, CL_PROFILING_COMMAND_START, sizeof(tstart), &tstart, NULL );
-  ciErrNum |= clGetEventProfilingInfo( ceEvent, CL_PROFILING_COMMAND_END, sizeof(tend), &tend, NULL );
-  assert_m( ciErrNum == CL_SUCCESS, "error getting profiling info" );
+  errorCode  = clGetEventProfilingInfo( event, CL_PROFILING_COMMAND_QUEUED, sizeof(tqueue), &tqueue, NULL );
+  errorCode |= clGetEventProfilingInfo( event, CL_PROFILING_COMMAND_SUBMIT, sizeof(tsubmit), &tsubmit, NULL );
+  errorCode |= clGetEventProfilingInfo( event, CL_PROFILING_COMMAND_START, sizeof(tstart), &tstart, NULL );
+  errorCode |= clGetEventProfilingInfo( event, CL_PROFILING_COMMAND_END, sizeof(tend), &tend, NULL );
+  assert_m( errorCode == CL_SUCCESS, "error getting profiling info" );
   OP_kernels[0].queue_time      += (tsubmit - tqueue);
   OP_kernels[0].wait_time       += (tstart - tsubmit);
   OP_kernels[0].execution_time  += (tend - tstart);
@@ -155,11 +156,11 @@ void adt_calc_host(const char *userSubroutine,op_set set,op_arg opDat1,op_arg op
 
 #ifdef PROFILE
     cl_ulong tqueue, tsubmit, tstart, tend, telapsed;
-    ciErrNum = clGetEventProfilingInfo( ceEvent, CL_PROFILING_COMMAND_QUEUED, sizeof(cl_ulong), &tqueue, NULL );
-    ciErrNum |= clGetEventProfilingInfo( ceEvent, CL_PROFILING_COMMAND_SUBMIT, sizeof(cl_ulong), &tsubmit, NULL );
-    ciErrNum |= clGetEventProfilingInfo( ceEvent, CL_PROFILING_COMMAND_START, sizeof(cl_ulong), &tstart, NULL );
-    ciErrNum |= clGetEventProfilingInfo( ceEvent, CL_PROFILING_COMMAND_END, sizeof(cl_ulong), &tend, NULL );
-    assert_m( ciErrNum == CL_SUCCESS, "error getting profiling info" );
+    errorCode = clGetEventProfilingInfo( event, CL_PROFILING_COMMAND_QUEUED, sizeof(cl_ulong), &tqueue, NULL );
+    errorCode |= clGetEventProfilingInfo( event, CL_PROFILING_COMMAND_SUBMIT, sizeof(cl_ulong), &tsubmit, NULL );
+    errorCode |= clGetEventProfilingInfo( event, CL_PROFILING_COMMAND_START, sizeof(cl_ulong), &tstart, NULL );
+    errorCode |= clGetEventProfilingInfo( event, CL_PROFILING_COMMAND_END, sizeof(cl_ulong), &tend, NULL );
+    assert_m( errorCode == CL_SUCCESS, "error getting profiling info" );
     OP_kernels[1].queue_time      += (tsubmit - tqueue);
     OP_kernels[1].wait_time       += (tstart - tsubmit);
     OP_kernels[1].execution_time  += (tend - tstart);
@@ -262,11 +263,11 @@ void res_calc_host(const char *userSubroutine,op_set set,op_arg opDat1,op_arg op
     //printf("RES_CALC_command_queue_completed");
 #ifdef PROFILE
     cl_ulong tqueue, tsubmit, tstart, tend, telapsed;
-    ciErrNum = clGetEventProfilingInfo( ceEvent, CL_PROFILING_COMMAND_QUEUED, sizeof(cl_ulong), &tqueue, NULL );
-    ciErrNum |= clGetEventProfilingInfo( ceEvent, CL_PROFILING_COMMAND_SUBMIT, sizeof(cl_ulong), &tsubmit, NULL );
-    ciErrNum |= clGetEventProfilingInfo( ceEvent, CL_PROFILING_COMMAND_START, sizeof(cl_ulong), &tstart, NULL );
-    ciErrNum |= clGetEventProfilingInfo( ceEvent, CL_PROFILING_COMMAND_END, sizeof(cl_ulong), &tend, NULL );
-    assert_m( ciErrNum == CL_SUCCESS, "error getting profiling info" );
+    errorCode = clGetEventProfilingInfo( event, CL_PROFILING_COMMAND_QUEUED, sizeof(cl_ulong), &tqueue, NULL );
+    errorCode |= clGetEventProfilingInfo( event, CL_PROFILING_COMMAND_SUBMIT, sizeof(cl_ulong), &tsubmit, NULL );
+    errorCode |= clGetEventProfilingInfo( event, CL_PROFILING_COMMAND_START, sizeof(cl_ulong), &tstart, NULL );
+    errorCode |= clGetEventProfilingInfo( event, CL_PROFILING_COMMAND_END, sizeof(cl_ulong), &tend, NULL );
+    assert_m( errorCode == CL_SUCCESS, "error getting profiling info" );
     OP_kernels[2].queue_time      += (tsubmit - tqueue);
     OP_kernels[2].wait_time       += (tstart - tsubmit);
     OP_kernels[2].execution_time  += (tend - tstart);
@@ -377,11 +378,11 @@ void bres_calc_host(const char *userSubroutine,op_set set,op_arg opDat1,op_arg o
     //printf("BRES_CALC_command_queue_completed\n");
 #ifdef PROFILE
     cl_ulong tqueue, tsubmit, tstart, tend, telapsed;
-    ciErrNum = clGetEventProfilingInfo( ceEvent, CL_PROFILING_COMMAND_QUEUED, sizeof(cl_ulong), &tqueue, NULL );
-    ciErrNum |= clGetEventProfilingInfo( ceEvent, CL_PROFILING_COMMAND_SUBMIT, sizeof(cl_ulong), &tsubmit, NULL );
-    ciErrNum |= clGetEventProfilingInfo( ceEvent, CL_PROFILING_COMMAND_START, sizeof(cl_ulong), &tstart, NULL );
-    ciErrNum |= clGetEventProfilingInfo( ceEvent, CL_PROFILING_COMMAND_END, sizeof(cl_ulong), &tend, NULL );
-    assert_m( ciErrNum == CL_SUCCESS, "error getting profiling info" );
+    errorCode = clGetEventProfilingInfo( event, CL_PROFILING_COMMAND_QUEUED, sizeof(cl_ulong), &tqueue, NULL );
+    errorCode |= clGetEventProfilingInfo( event, CL_PROFILING_COMMAND_SUBMIT, sizeof(cl_ulong), &tsubmit, NULL );
+    errorCode |= clGetEventProfilingInfo( event, CL_PROFILING_COMMAND_START, sizeof(cl_ulong), &tstart, NULL );
+    errorCode |= clGetEventProfilingInfo( event, CL_PROFILING_COMMAND_END, sizeof(cl_ulong), &tend, NULL );
+    assert_m( errorCode == CL_SUCCESS, "error getting profiling info" );
     OP_kernels[3].queue_time      += (tsubmit - tqueue);
     OP_kernels[3].wait_time       += (tstart - tsubmit);
     OP_kernels[3].execution_time  += (tend - tstart);
@@ -470,11 +471,11 @@ void update_host(const char *userSubroutine,op_set set,op_arg opDat1,op_arg opDa
   }
 #ifdef PROFILE
     cl_ulong tqueue, tsubmit, tstart, tend, telapsed;
-    ciErrNum = clGetEventProfilingInfo( ceEvent, CL_PROFILING_COMMAND_QUEUED, sizeof(cl_ulong), &tqueue, NULL );
-    ciErrNum |= clGetEventProfilingInfo( ceEvent, CL_PROFILING_COMMAND_SUBMIT, sizeof(cl_ulong), &tsubmit, NULL );
-    ciErrNum |= clGetEventProfilingInfo( ceEvent, CL_PROFILING_COMMAND_START, sizeof(cl_ulong), &tstart, NULL );
-    ciErrNum |= clGetEventProfilingInfo( ceEvent, CL_PROFILING_COMMAND_END, sizeof(cl_ulong), &tend, NULL );
-    assert_m( ciErrNum == CL_SUCCESS, "error getting profiling info" );
+    errorCode = clGetEventProfilingInfo( event, CL_PROFILING_COMMAND_QUEUED, sizeof(cl_ulong), &tqueue, NULL );
+    errorCode |= clGetEventProfilingInfo( event, CL_PROFILING_COMMAND_SUBMIT, sizeof(cl_ulong), &tsubmit, NULL );
+    errorCode |= clGetEventProfilingInfo( event, CL_PROFILING_COMMAND_START, sizeof(cl_ulong), &tstart, NULL );
+    errorCode |= clGetEventProfilingInfo( event, CL_PROFILING_COMMAND_END, sizeof(cl_ulong), &tend, NULL );
+    assert_m( errorCode == CL_SUCCESS, "error getting profiling info" );
     OP_kernels[4].queue_time      += (tsubmit - tqueue);
     OP_kernels[4].wait_time       += (tstart - tsubmit);
     OP_kernels[4].execution_time  += (tend - tstart);

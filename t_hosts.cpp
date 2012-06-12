@@ -1,7 +1,5 @@
-#include <utility>
 #include <CL/cl.h>
-//#include "op_lib_cpp.h" -> WRONG
-#include "op_opencl_rt_support.h"
+#include "op_lib_cpp.h"
 extern float alpha;
 extern float cfl;
 extern float eps;
@@ -17,7 +15,6 @@ int threadsPerBlockSize_res_calc = 512;
 int setPartitionSize_res_calc = 0;
 int threadsPerBlockSize_save_soln = 512;
 int threadsPerBlockSize_update = 512;
-
 void adt_calc_host(const char *userSubroutine,op_set set,op_arg opDat1,op_arg opDat2,op_arg opDat3,op_arg opDat4,op_arg opDat5,op_arg opDat6)
 {
   size_t blocksPerGrid;
@@ -86,7 +83,6 @@ void adt_calc_host(const char *userSubroutine,op_set set,op_arg opDat1,op_arg op
     blockOffset += blocksPerGrid;
   }
 }
-
 void bres_calc_host(const char *userSubroutine,op_set set,op_arg opDat1,op_arg opDat2,op_arg opDat3,op_arg opDat4,op_arg opDat5,op_arg opDat6)
 {
   size_t blocksPerGrid;
@@ -161,7 +157,6 @@ void bres_calc_host(const char *userSubroutine,op_set set,op_arg opDat1,op_arg o
     blockOffset += blocksPerGrid;
   }
 }
-
 void res_calc_host(const char *userSubroutine,op_set set,op_arg opDat1,op_arg opDat2,op_arg opDat3,op_arg opDat4,op_arg opDat5,op_arg opDat6,op_arg opDat7,op_arg opDat8)
 {
   size_t blocksPerGrid;
@@ -239,7 +234,6 @@ void res_calc_host(const char *userSubroutine,op_set set,op_arg opDat1,op_arg op
     blockOffset += blocksPerGrid;
   }
 }
-
 void save_soln_host(const char *userSubroutine,op_set set,op_arg opDat1,op_arg opDat2)
 {
   size_t blocksPerGrid;
@@ -270,7 +264,6 @@ void save_soln_host(const char *userSubroutine,op_set set,op_arg opDat1,op_arg o
   errorCode = clFinish(cqCommandQueue);
   assert_m(errorCode == CL_SUCCESS,"Error completing device command queue");
 }
-
 void update_host(const char *userSubroutine,op_set set,op_arg opDat1,op_arg opDat2,op_arg opDat3,op_arg opDat4,op_arg opDat5)
 {
   size_t blocksPerGrid;

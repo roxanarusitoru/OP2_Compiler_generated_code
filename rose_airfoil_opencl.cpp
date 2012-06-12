@@ -197,8 +197,8 @@ int main(int argc,char *argv[])
     if ((iter % 100) == 0) 
       printf(" %d  %10.5e \n",iter,rms);
   }
-  for (int ll = 0; ll < (4 * ncell); ll++) 
-    printf("%lf\n",q[ll]);
+/*  for (int ll = 0; ll < (4 * ncell); ll++) 
+    printf("%lf\n",q[ll]);*/
   op_timing_output();
   return 0;
 }

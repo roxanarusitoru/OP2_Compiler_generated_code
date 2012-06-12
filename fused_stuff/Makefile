@@ -11,7 +11,7 @@ endif
 export OPENCL
 
 BLOCK_SIZE := 64
-PART_SIZE := 64
+PART_SIZE := 128
 
 ifndef BLOCK_SIZE
 	BLOCK_SIZE := 256
