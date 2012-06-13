@@ -38,7 +38,7 @@ CPPFLAGS 	:= -g -fPIC -DUNIX -Wall -DOP_BLOCK_SIZE_0=$(BLOCK_SIZE) -DOP_WARPSIZE
 all: airfoil_opencl
 
 airfoil_opencl: rose_airfoil_opencl.cpp rose_airfoil_opencl_hosts.o Makefile
-	$(CPP) $(CPPFLAGS) $(OCLINC) $(OP2_INC) -o airfoil_opencl rose_airfoil_opencl.cpp rose_airfoil_opencl_hosts.o $(OP2_LIB) $(OCLLIB) -lop2_tuner -lop2_opencl
+	$(CPP) $(CPPFLAGS) $(OCLINC) $(OP2_INC) -o airfoil_opencl rose_airfoil_opencl.cpp rose_airfoil_opencl_hosts.o $(OP2_LIB) $(OCLLIB) -lop2_opencl
 
 rose_airfoil_opencl_hosts.o: rose_opencl_hosts.cpp Makefile 
 	$(CPP) $(CPPFLAGS) $(OCLINC) $(OP2_INC) -c -o rose_airfoil_opencl_hosts.o rose_opencl_hosts.cpp 
